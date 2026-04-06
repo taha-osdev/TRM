@@ -1,0 +1,373 @@
+TRM Architecture v1.0
+
+CPU
+
+The processor has 4 cores: Core 1, Core 2, Core 3, Core 4.
+
+Each core includes:
+
+* a 16-register register file
+* an ALU connected to a barrel shifter
+* flags and branch logic
+
+All cores are connected to the Core Controller, and the Core Controller is connected to the Control Unit.
+
+Example instruction flow:
+
+If PROM contains:
+ADD c1 r3 r1 r2
+
+This means:
+
+* Core 1 adds r1 and r2
+* the result is written to r3
+
+The instruction format is 20 bits total:
+
+* 3 bits for core ID
+* 8 bits for operands
+* 5 bits for instruction opcode
+* 4 bits for destination register
+
+PROM sends the instruction to the Control Unit.
+The Control Unit separates the bits and forwards them to the Core Controller.
+The Core Controller sends the required inputs to the selected core.
+The core executes the instruction and returns the result.
+The Control Unit stores the result in the Data Cache, from where it can later be loaded.
+
+Memory System
+
+RAM size is 4 KB (4096 bytes).
+
+The basic addressing model is:
+
+* 12-bit RAM address
+* 1-bit operation type
+* 0 = RAM load
+* 1 = RAM store
+* 8-bit data field for store operations
+
+TRM also supports virtual memory:
+
+* Virtual addresses are sent to the MMU
+* The MMU checks the TLB
+* If the address exists in the TLB, it is translated immediately
+* If there is a TLB miss, the MMU resolves the address and stores the translation for later use
+
+Optional fields:
+
+* 1-bit isReserved flag
+* 3 to 4 bits for programID
+
+These can be used for memory reservation and program-specific allocation.
+
+Instructions
+
+00000 NOP  : No operation
+00001 ADD  : ADD core destinationReg reg1 reg2
+00010 SUB  : SUB core destinationReg reg1 reg2
+00011 BTA  : Bitwise operation type (1 = OR 10 = AND 11 = NOT 100 = XOR 101 = NOR 110 = NAND)
+00100 BIT  : BIT core destinationReg reg1 reg2
+00101 ADI  : ADD immediate
+00110 LDI  : Load immediate
+00111 JMP  : Jump address
+01000 BIF  : Branch if flag (1 = carry 10 = zero 11 = overflow 100 = sign 101 = parity)
+01001 MOV  : MOV core r1 r2
+01010 CMP  : CMP core r1 r2
+01011 CPY  : CPY core rDest r1
+01100 CLL  : Call function
+01101 RET  : Return
+01110 PLD  : Port load
+01111 PSR  : Port store
+10000 DCL  : Declare core register
+10001 DCA  : Data cache address
+10010 RMA  : RAM address
+10011 RMS  : RAM store
+10100 RML  : RAM load
+10101 PSH  : Push
+10110 POP  : Pop
+10111 SHT  : Shift type (1 = right shift 10 = left shift)
+11000 SHF  : Barrel shift
+11001 VAR  : Variable declaration
+11010 SET  : Set variable value
+11111 HLT  : Halt
+
+Instruction behavior example:
+
+If BTA AND is set first, then BIT c1 r3 r1 r2 is executed,
+the Control Unit uses the previously stored bitwise type and applies AND during execution.
+
+Pipeline
+
+TRM uses the following pipeline stages:
+
+1. Instruction Fetch (IF)
+   The 20-bit instruction is fetched from PROM.
+
+2. Decode & Operand Fetch (DF)
+   The instruction is decoded and its operands are separated.
+
+3. Execute (EX)
+   The ALU or barrel shifter performs the operation.
+
+4. Memory Access (MEM)
+   RAM or Data Cache access happens here.
+   Virtual-to-physical translation is handled by the MMU and TLB.
+
+5. Write-Back (WB)
+   The result is written back to the register file or cache.
+
+Pipeline registers are used between each stage:
+
+* IF Register
+* DF1 Register
+* DF2 Register
+* EX Register
+* MEM Register
+* WB Register
+
+I/O System
+
+TRM has 15 input ports and 15 output ports.
+
+Instructions:
+
+* PSR is used to store data to a port
+* PLD is used to load data from a port
+
+Data can be routed through the Data Cache before use.
+How the input and output are handled visually is left to the display layer.
+
+RAM Partition
+
+RAM size is 4096 bytes.
+
+The last bytes can be reserved for display use.
+Example:
+
+* 4092: type
+* 4093: number
+* 4094: x coordinate
+* 4095: y coordinate
+
+This layout is optional and can be changed depending on the design.
+
+PROM
+
+PROM size is 4096 bytes.
+
+The first 8 bytes are reserved for TSBIOS, the TRM Style BIOS.
+
+Call Stack
+
+The call stack size is 64 bytes.
+
+When CLL is executed:
+
+* the return address of the next instruction is pushed to the stack
+* the Program Counter is set to the function entry address
+
+When RET is executed:
+
+* the top return address is popped from the stack
+* the Program Counter returns to that address
+
+The stack follows LIFO behavior.
+The Control Unit is responsible for checking stack overflow and underflow.
+
+Expandability
+
+TRM is designed to be expandable.
+
+If higher capacity is needed:
+
+* bit widths can be increased
+* operand size can be expanded from 8 bits to 16 bits or 32 bit
+
+TÜRKÇE :
+
+TRM Mimarisi v1.0
+
+CPU
+
+İşlemcide 4 çekirdek vardır: Core 1, Core 2, Core 3, Core 4.
+
+Her çekirdekte şunlar bulunur:
+
+* 16 register’lık register file
+* ALU’ya bağlı barrel shifter
+* flags ve branch logic
+
+Tüm core’lar Core Controller’a bağlıdır, Core Controller da Control Unit’e bağlıdır.
+
+Örnek instruction akışı:
+
+PROM içinde şu komut varsa:
+ADD c1 r3 r1 r2
+
+Bu şu anlama gelir:
+
+* Core 1, r1 ile r2’yi toplar
+* sonucu r3’e yazar
+
+Komut formatı toplam 20 bittir:
+
+* 3 bit core ID
+* 8 bit operand
+* 5 bit instruction opcode
+* 4 bit destination register
+
+PROM komutu Control Unit’e yollar.
+Control Unit bitleri ayırır ve Core Controller’a iletir.
+Core Controller gerekli girdileri seçilen core’a gönderir.
+Core işlemi yapar ve sonucu geri yollar.
+Control Unit sonucu Data Cache’e kaydeder, gerektiğinde oradan yüklenir.
+
+Memory System
+
+RAM boyutu 4 KB’dır (4096 byte).
+
+Temel adresleme modeli:
+
+* 12 bit RAM address
+* 1 bit işlem türü
+* 0 = RAM load
+* 1 = RAM store
+* store işlemlerinde 8 bit veri alanı
+
+TRM sanal belleği de destekler:
+
+* Sanal adres MMU’ya gider
+* MMU TLB’ye bakar
+* Eğer varsa adres direkt çevrilir
+* Yoksa MMU adresi çözer ve sonradan kullanmak için kayıt eder
+
+İsteğe bağlı alanlar:
+
+* 1 bit isReserved flag
+* 3 ya da 4 bit programID
+
+Bunlar bellek rezervasyonu ve programa özel ayrım için kullanılabilir.
+
+Instructions
+
+00000 NOP  : İşlem yok
+00001 ADD  : ADD core destinationReg reg1 reg2
+00010 SUB  : SUB core destinationReg reg1 reg2
+00011 BTA  : Bitwise işlem türü (1 = OR 10 = AND 11 = NOT 100 = XOR 101 = NOR 110 = NAND)
+00100 BIT  : BIT core destinationReg reg1 reg2
+00101 ADI  : Immediate ile toplama
+00110 LDI  : Immediate yükleme
+00111 JMP  : Adrese atla
+01000 BIF  : Flag varsa dallan (1 = carry 10 = zero 11 = overflow 100 = sign 101 = parity)
+01001 MOV  : MOV core r1 r2
+01010 CMP  : CMP core r1 r2
+01011 CPY  : CPY core rDest r1
+01100 CLL  : Fonksiyon çağır
+01101 RET  : Geri dön
+01110 PLD  : Port load
+01111 PSR  : Port store
+10000 DCL  : Core register tanımla
+10001 DCA  : Data cache address
+10010 RMA  : RAM address
+10011 RMS  : RAM store
+10100 RML  : RAM load
+10101 PSH  : Stack’e push
+10110 POP  : Stack’ten pop
+10111 SHT  : Shift türü (1 = right shift 10 = left shift)
+11000 SHF  : Barrel shift
+11001 VAR  : Değişken tanımla
+11010 SET  : Değişken değeri ata
+11111 HLT  : Durdur
+
+Instruction örneği:
+
+Önce BTA AND ayarlanırsa, sonra BIT c1 r3 r1 r2 çalıştırıldığında,
+Control Unit daha önce saklanan bitwise türünü kullanır ve execution sırasında AND uygular.
+
+Pipeline
+
+TRM şu pipeline aşamalarını kullanır:
+
+1. Instruction Fetch (IF)
+   20 bitlik komut PROM’dan okunur.
+
+2. Decode & Operand Fetch (DF)
+   Komut çözülür ve operandlar ayrılır.
+
+3. Execute (EX)
+   ALU veya barrel shifter işlemi yapar.
+
+4. Memory Access (MEM)
+   RAM veya Data Cache erişimi burada yapılır.
+   Sanal-fiziksel adres çevirme MMU ve TLB tarafından gerçekleştirilir.
+
+5. Write-Back (WB)
+   Sonuç register file’a veya cache’e yazılır.
+
+Her aşama arasında pipeline register kullanılır:
+
+* IF Register
+* DF1 Register
+* DF2 Register
+* EX Register
+* MEM Register
+* WB Register
+
+I/O System
+
+TRM’de 15 input port ve 15 output port vardır.
+
+Instruction’lar:
+
+* PSR, porta veri göndermek için kullanılır
+* PLD, porttan veri okumak için kullanılır
+
+Veri gerekirse Data Cache üzerinden geçirilebilir.
+Input ve output’un ekranda nasıl gösterileceği display katmanına bırakılır.
+
+RAM Partition
+
+RAM boyutu 4096 byte’tır.
+
+Son byte’lar display için ayrılabilir.
+Örnek:
+
+* 4092: type
+* 4093: number
+* 4094: x koordinatı
+* 4095: y koordinatı
+
+Bu düzen isteğe bağlıdır.
+
+PROM
+
+PROM boyutu 4096 byte’tır.
+
+İlk 8 byte TSBIOS, yani TRM Style BIOS için ayrılmıştır.
+
+Call Stack
+
+Call stack boyutu 64 byte’tır.
+
+CLL çalışınca:
+
+* sonraki instruction’ın dönüş adresi stack’e push edilir
+* Program Counter fonksiyonun başlangıç adresine ayarlanır
+
+RET çalışınca:
+
+* stack’in en üstündeki dönüş adresi pop edilir
+* Program Counter o adrese geri döner
+
+Stack LIFO mantığıyla çalışır.
+Control Unit stack overflow ve underflow kontrolü yapar.
+
+Expandability
+
+TRM genişletilebilir bir mimari olarak tasarlanmıştır.
+
+Daha fazla kapasite gerekirse:
+
+* bit genişlikleri artırılabilir
+* operand boyutu 8 bitten 16 bite veya 32 bite çıkarılabilir
